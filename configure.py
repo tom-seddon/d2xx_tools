@@ -191,9 +191,22 @@ def main2(options):
               '-B',output_path]
 
         ret=run_subprocess(argv,options,close_fds=False)
-
         if ret.returncode!=0: fatal('init failed')
 
+    elif is_macos():
+        output_path=options.output_path
+        if output_path is None: output_path='build/Xcode'
+
+        if options.clean: rmtree(output_path)
+        makedirs(output_path)
+
+        argv=['cmake',
+              '-G','Xcode',
+              '-S','.',
+              '-B',output_path]
+
+        ret=run_subprocess(argv,options,close_fds=False)
+        if ret.returncode!=0: fatal('init failed')
     else:
         fatal('unsupported OS')
 
