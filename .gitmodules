@@ -1,0 +1,6 @@
+[submodule "submodules/shared_lib"]
+	path = submodules/shared_lib
+	url = https://github.com/tom-seddon/shared_lib
+[submodule "submodules/shellcmd.py"]
+	path = submodules/shellcmd.py
+	url = https://github.com/tom-seddon/shellcmd.py
