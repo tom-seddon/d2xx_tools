@@ -8,5 +8,10 @@ enable_testing()
 # TODO: this should be part of shared_lib
 include(CheckCSourceCompiles)
 
+# Always link with libcmt, since that's what the d2xx lib links with.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")#$<$<CONFIG:Debug>:DebugDLL>")
+
+
 add_subdirectory(submodules)
+add_subdirectory(dependencies)
 add_subdirectory(src)

@@ -1,0 +1,7 @@
+if(WIN32)
+  add_library(d2xx_lib STATIC IMPORTED GLOBAL)
+  set_property(TARGET d2xx_lib
+    PROPERTY IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/windows/FTDI-Driver/static/amd64/FTD2XX.lib")
+  target_compile_definitions(d2xx_lib INTERFACE FTD2XX_STATIC)
+  target_include_directories(d2xx_lib INTERFACE "./windows/FTDI-Driver")
+endif()
