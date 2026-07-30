@@ -1,0 +1,9 @@
+#+STARTUP: overview
+
+* command lines
+
+#+begin_example
+com4 d:\tom\github\fdload_dfs\tests\beeblink\fdload_dfs\1\$.SCR0
+#+end_example
+
+* eof.

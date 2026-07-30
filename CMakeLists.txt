@@ -5,6 +5,8 @@ project(d2xx_tools)
 set(CMAKE_SKIP_INSTALL_RULES YES)
 enable_testing()
 
+set(CMAKE_CXX_SCAN_FOR_MODULES FALSE)
+
 # TODO: this should be part of shared_lib
 include(CheckCSourceCompiles)
 
