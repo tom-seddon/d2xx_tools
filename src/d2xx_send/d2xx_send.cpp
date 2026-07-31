@@ -3,42 +3,12 @@
 #include <shared/system_specific.h>
 #include <shared/file_io.h>
 #include <stdio.h>
-#include <ftd2xx.h>
+#include <d2xx_shared.h>
 #include <vector>
 #include <string>
 #include <inttypes.h>
 #include <map>
-
-//////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////
-
-#include <shared/enum_def.h>
-#define ENAME FT_STATUS
-NBEGIN(FT_STATUS)
-NN(FT_OK)
-NN(FT_INVALID_HANDLE)
-NN(FT_DEVICE_NOT_FOUND)
-NN(FT_DEVICE_NOT_OPENED)
-NN(FT_IO_ERROR)
-NN(FT_INSUFFICIENT_RESOURCES)
-NN(FT_INVALID_PARAMETER)
-NN(FT_INVALID_BAUD_RATE)
-NN(FT_DEVICE_NOT_OPENED_FOR_ERASE)
-NN(FT_DEVICE_NOT_OPENED_FOR_WRITE)
-NN(FT_FAILED_TO_WRITE_DEVICE)
-NN(FT_EEPROM_READ_FAILED)
-NN(FT_EEPROM_WRITE_FAILED)
-NN(FT_EEPROM_ERASE_FAILED)
-NN(FT_EEPROM_NOT_PRESENT)
-NN(FT_EEPROM_NOT_PROGRAMMED)
-NN(FT_INVALID_ARGS)
-NN(FT_NOT_SUPPORTED)
-NN(FT_OTHER_ERROR)
-NN(FT_DEVICE_LIST_NOT_READY)
-NEND()
-#undef ENAME
-
-#include <shared/enum_end.h>
+#include <type_traits>
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
