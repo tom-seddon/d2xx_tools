@@ -20,6 +20,17 @@ class CommandLineParser;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+// not amazing naming for this really.
+struct DeviceSpec {
+    bool open_by_serial_number = false;
+    bool open_by_description = false;
+};
+
+void AddDeviceSpecCommandLineOptions(CommandLineParser *parser, DeviceSpec *device_spec);
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
 struct DeviceOptions {
     int baud_rate = 115200;
     UCHAR bits = FT_BITS_8;
@@ -44,6 +55,8 @@ const FT_DEVICE_LIST_INFO_NODE *FindDeviceByCOMPortName(const std::vector<FT_DEV
 
 const FT_DEVICE_LIST_INFO_NODE *FindDeviceBySerialNumber(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &serial_number);
 const FT_DEVICE_LIST_INFO_NODE *FindDeviceByDescription(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &description);
+
+FT_HANDLE OpenDevice(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &name, const DeviceSpec &spec, const DeviceOptions &options);
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

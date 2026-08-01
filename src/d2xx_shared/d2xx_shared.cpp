@@ -10,6 +10,14 @@
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+void AddDeviceSpecCommandLineOptions(CommandLineParser *parser, DeviceSpec *device_spec) {
+    parser->AddOption("serial-number").SetIfPresent(&device_spec->open_by_serial_number).Help("DEVICE is device's serial number");
+    parser->AddOption("description").SetIfPresent(&device_spec->open_by_serial_number).Help("DEVICE is device's description");
+}
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
 void AddDeviceOptionsCommandLineOptions(CommandLineParser *parser, DeviceOptions *device_options) {
     parser->AddOption("baud").Meta("BAUD").Arg(&device_options->baud_rate).ShowDefault().Help("use baud rate BAUD");
     parser->AddOption("bits").Meta("BITS").EnumArg(&device_options->bits, GetFT_BITSEnumTraits()).ShowDefault().Help("set bits to BITS");
@@ -41,6 +49,11 @@ bool GetDeviceList(std::vector<FT_DEVICE_LIST_INFO_NODE> *devices) {
     status = FT_CreateDeviceInfoList(&num_devices);
     if (status != FT_OK) {
         return PrintFTD2xxError(status, "FT_CreateDeviceInfoList");
+    }
+
+    if (num_devices == 0) {
+        fprintf(stderr, "FATAL: no FTDI devices found\n");
+        return false;
     }
 
     devices->resize(num_devices);
@@ -103,4 +116,55 @@ const FT_DEVICE_LIST_INFO_NODE *FindDeviceBySerialNumber(const std::vector<FT_DE
 const FT_DEVICE_LIST_INFO_NODE *FindDeviceByDescription(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &description) {
     const FT_DEVICE_LIST_INFO_NODE *device = FindDevice(devices, offsetof(FT_DEVICE_LIST_INFO_NODE, Description), description);
     return device;
+}
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+FT_HANDLE OpenDevice(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &name, const DeviceSpec &spec, const DeviceOptions &options) {
+    FT_STATUS status;
+
+    const FT_DEVICE_LIST_INFO_NODE *device;
+    if (spec.open_by_description) {
+        device = FindDeviceByDescription(devices, name);
+    } else if (spec.open_by_serial_number) {
+        device = FindDeviceBySerialNumber(devices, name);
+    } else {
+        device = FindDeviceByCOMPortName(devices, name);
+    }
+
+    if (!device) {
+        fprintf(stderr, "FATAL: failed to find device: %s\n", name.c_str());
+        return nullptr;
+    }
+
+    FT_HANDLE handle;
+    status = FT_OpenEx((PVOID)device->SerialNumber, FT_OPEN_BY_SERIAL_NUMBER, &handle);
+    if (status != FT_OK) {
+        PrintFTD2xxError(status, "FT_OpenEx", name.c_str());
+        return nullptr;
+    }
+
+    status = FT_SetBaudRate(handle, (DWORD)options.baud_rate);
+    if (status != FT_OK) {
+        PrintFTD2xxError(status, "FT_SetBaudRate", name.c_str());
+        FT_Close(handle);
+        return nullptr;
+    }
+
+    status = FT_SetDataCharacteristics(handle, options.bits, options.stop_bits, options.parity);
+    if (status != FT_OK) {
+        PrintFTD2xxError(status, "FT_SetDataCharacteristics", name.c_str());
+        FT_Close(handle);
+        return nullptr;
+    }
+
+    status = FT_SetFlowControl(handle, options.flow_control, 0, 0);
+    if (status != FT_OK) {
+        PrintFTD2xxError(status, "FT_SetFlowControl", name.c_str());
+        FT_Close(handle);
+        return nullptr;
+    }
+
+    return handle;
 }

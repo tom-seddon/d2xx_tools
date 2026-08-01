@@ -15,10 +15,9 @@
 
 struct Options {
     std::vector<std::string> paths;
-    std::string device;
-    bool open_by_serial_number = false;
-    bool open_by_description = false;
     bool help = false;
+    std::string device;
+    DeviceSpec device_spec;
     DeviceOptions device_options;
 };
 
@@ -28,8 +27,6 @@ struct Options {
 static bool DoCommandLine(int argc, char *argv[], Options *options) {
     CommandLineParser parser("send file over FTDI serial device", "[OPTIONS] DEVICE FILE0 [FILE1...]");
 
-    parser.AddOption("serial-number").SetIfPresent(&options->open_by_serial_number).Help("DEVICE is device's serial number");
-    parser.AddOption("description").SetIfPresent(&options->open_by_serial_number).Help("DEVICE is device's description");
     parser.AddHelpOption(&options->help);
 
     std::vector<std::string> other_args;
@@ -86,45 +83,9 @@ static bool main2(int argc, char *argv[]) {
         return false;
     }
 
-    if (devices.empty()) {
-        fprintf(stderr, "FATAL: no FTDI devices found\n");
+    FT_HANDLE handle = OpenDevice(devices, options.device, options.device_spec, options.device_options);
+    if (!handle) {
         return false;
-    }
-
-    const FT_DEVICE_LIST_INFO_NODE *device;
-    if (options.open_by_description) {
-        device = FindDeviceByDescription(devices, options.device);
-    } else if (options.open_by_serial_number) {
-        device = FindDeviceBySerialNumber(devices, options.device);
-    } else {
-        device = FindDeviceByCOMPortName(devices, options.device);
-    }
-
-    if (!device) {
-        fprintf(stderr, "FATAL: failed to find device: %s\n", options.device.c_str());
-        return false;
-    }
-
-    FT_HANDLE handle;
-    status = FT_OpenEx((PVOID)device->SerialNumber, FT_OPEN_BY_SERIAL_NUMBER, &handle);
-    if (status != FT_OK) {
-        return PrintFTD2xxError(status, "FT_OpenEx", options.device.c_str());
-        return false;
-    }
-
-    status = FT_SetBaudRate(handle, (DWORD)options.device_options.baud_rate);
-    if (status != FT_OK) {
-        return PrintFTD2xxError(status, "FT_SetBaudRate", options.device.c_str());
-    }
-
-    status = FT_SetDataCharacteristics(handle, options.device_options.bits, options.device_options.stop_bits, options.device_options.parity);
-    if (status != FT_OK) {
-        return PrintFTD2xxError(status, "FT_SetDataCharacteristics", options.device.c_str());
-    }
-
-    status = FT_SetFlowControl(handle, options.device_options.flow_control, 0, 0);
-    if (status != FT_OK) {
-        return PrintFTD2xxError(status, "FT_SetFlowControl", options.device.c_str());
     }
 
     for (size_t path_index = 0; path_index < options.paths.size(); ++path_index) {
