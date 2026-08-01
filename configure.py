@@ -179,19 +179,27 @@ def main2(options):
         if vsyear is None: vsyear=VISUAL_STUDIO_DEFAULT_YEAR
         vs_stuff=get_vs_stuff(vsyear)
 
-        output_path=options.output_path
-        if output_path is None: output_path=f'''build/vs{vs_stuff.year}'''
+        root_output_path=options.output_path
+        if root_output_path is None: root_output_path='build'
 
-        if options.clean: rmtree(output_path)
-        makedirs(output_path)
+        def cmake_vs(arch):
+            output_path=os.path.join(root_output_path,
+                                     f'''vs{vs_stuff.year}.{arch}''')
 
-        argv=[vs_stuff.cmake_path,
-              '-G',f'''Visual Studio {vs_stuff.version} {vs_stuff.year}''',
-              '-S','.',
-              '-B',output_path]
+            if options.clean: rmtree(output_path)
+            makedirs(output_path)
 
-        ret=run_subprocess(argv,options,close_fds=False)
-        if ret.returncode!=0: fatal('init failed')
+            argv=[vs_stuff.cmake_path,
+                  '-G',f'''Visual Studio {vs_stuff.version} {vs_stuff.year}''',
+                  '-A',arch,
+                  '-S','.',
+                  '-B',output_path]
+
+            ret=run_subprocess(argv,options,close_fds=False)
+            if ret.returncode!=0: fatal('init failed')
+
+        cmake_vs('x64')
+        cmake_vs('Win32')
 
     elif is_macos():
         output_path=options.output_path

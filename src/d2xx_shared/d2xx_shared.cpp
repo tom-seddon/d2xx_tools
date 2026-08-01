@@ -168,3 +168,28 @@ FT_HANDLE OpenDevice(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const
 
     return handle;
 }
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+void GetThousandsString(char *str, uint64_t value) {
+    char tmp[MAX_UINT64_THOUSANDS_SIZE];
+    char *p = tmp + sizeof tmp - 1;
+    int n = 3;
+
+    *p = 0;
+
+    do {
+        --p;
+        if (n == 0) {
+            *p = ',';
+            --p;
+            n = 3;
+        }
+        *p = '0' + value % 10;
+        value /= 10;
+        --n;
+    } while (value != 0);
+
+    memcpy(str, p, (size_t)(tmp + sizeof tmp - p));
+}

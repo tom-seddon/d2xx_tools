@@ -1,8 +1,9 @@
 #include <shared/system.h>
+#include <shared/system_specific.h>
 #include <stdio.h>
-#include <ftd2xx.h>
 #include <vector>
 #include <inttypes.h>
+#include <d2xx_shared.h>
 
 int main() {
     FT_STATUS status;
@@ -27,6 +28,26 @@ int main() {
 
         printf("Device %zu:\n", device_index);
 
+#if SYSTEM_WINDOWS
+        FT_HANDLE handle = nullptr;
+        status = FT_OpenEx((PVOID)device->SerialNumber, FT_OPEN_BY_SERIAL_NUMBER, &handle);
+        if (status == FT_OK) {
+            LONG com_port;
+            status = FT_GetComPortNumber(handle, &com_port);
+            if (status == FT_OK) {
+                printf(" COM port: COM%ld\n", com_port);
+            }
+            FT_Close(handle);
+            handle = nullptr;
+        }
+#endif
+
+        printf(" Description: \"%s\"\n", device->Description);
+
+        printf(" SerialNumber: %s\n", device->SerialNumber);
+
+        printf(" Type: 0x%x (%s)\n", device->Type, GetFT_DEVICEEnumName(device->Type));
+
         // 1=OPENED; 2=HISPEED
         printf(" Flags: 0x%x", device->Flags);
         {
@@ -44,31 +65,11 @@ int main() {
         }
         printf("\n");
 
-        printf(" Type: 0x%x\n", device->Type);
-
         printf(" ID: 0x%x\n", device->ID);
 
         printf(" LocId: 0x%x\n", device->LocId);
 
-        printf(" SerialNumber: %s\n", device->SerialNumber);
-
-        printf(" Description: \"%s\"\n", device->Description);
-
         // always seems to be NULL?
         //printf(" ftHandle: %p\n", device->ftHandle);
-
-#if SYSTEM_WINDOWS
-        FT_HANDLE handle = nullptr;
-        status = FT_OpenEx((PVOID)device->SerialNumber, FT_OPEN_BY_SERIAL_NUMBER, &handle);
-        if (status == FT_OK) {
-            LONG com_port;
-            status = FT_GetComPortNumber(handle, &com_port);
-            if (status == FT_OK) {
-                printf(" COM port: COM%ld\n", com_port);
-            }
-            FT_Close(handle);
-            handle = nullptr;
-        }
-#endif
     }
 }

@@ -27,6 +27,9 @@ struct Options {
 static bool DoCommandLine(int argc, char *argv[], Options *options) {
     CommandLineParser parser("send file over FTDI serial device", "[OPTIONS] DEVICE FILE0 [FILE1...]");
 
+    AddDeviceSpecCommandLineOptions(&parser, &options->device_spec);
+    AddDeviceOptionsCommandLineOptions(&parser, &options->device_options);
+
     parser.AddHelpOption(&options->help);
 
     std::vector<std::string> other_args;
@@ -55,17 +58,6 @@ static bool DoCommandLine(int argc, char *argv[], Options *options) {
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
-//static void PrintFailureMessage(FT_STATUS status, const std::string &call, const std::string &rest) {
-//    fprintf(stderr, "FATAL: %s failed (%ld; 0x%lx; %s)", call.c_str(), status, status, GetFT_STATUSEnumName(status));
-//    if (!rest.empty()) {
-//        fprintf(stderr, ": %s", rest.c_str());
-//    }
-//    fprintf(stderr, "\n");
-//}
-
-//////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////
-
 static bool main2(int argc, char *argv[]) {
     FT_STATUS status;
 
@@ -88,40 +80,85 @@ static bool main2(int argc, char *argv[]) {
         return false;
     }
 
+    bool show_progress = true;
+
     for (size_t path_index = 0; path_index < options.paths.size(); ++path_index) {
+        const std::string &path = options.paths[path_index];
 #if SYSTEM_WINDOWS
         // The paths are in the thread code page, but the file_io functions
         // assume the paths are UTF-8.
-        const std::string &path = GetUTF8String(GetWideString(options.paths[path_index], CP_THREAD_ACP));
+        const std::string &fopen_path = GetUTF8String(GetWideString(path, CP_THREAD_ACP));
 #else
-        const std::string &path = options.paths[path._index];
+        const std::string &fopen_path = path;
 #endif
 
         unsigned char buffer[65536];
-        FILE *f = fopenUTF8(path.c_str(), "rb");
+        FILE *f = fopenUTF8(fopen_path.c_str(), "rb");
         if (!f) {
-            fprintf(stderr, "FATAL: failed to open file: %s\n", options.paths[path_index].c_str());
+            fprintf(stderr, "FATAL: failed to open file: %s\n", path.c_str());
             return false;
         }
 
-        while (!feof(f)) {
-            size_t left = fread(buffer, 1, sizeof buffer, f);
-            if (ferror(f)) {
-                fprintf(stderr, "FATAL: failed to read from file: %s\n", options.paths[path_index].c_str());
+        uint64_t size = 0;
+        if (show_progress) {
+            if (fseek64(f, 0, SEEK_END) != 0) {
+                fprintf(stderr, "FATAL: failed to get file size (1): %s\n", path.c_str());
                 return false;
             }
 
-            const unsigned char *p = buffer;
-            while (left > 0) {
-                DWORD num_written;
-                status = FT_Write(handle, (LPVOID)p, (DWORD)left, &num_written);
-                if (status != FT_OK) {
-                    return PrintFTD2xxError(status, "FT_Write", options.device.c_str());
+            int64_t pos = ftell64(f);
+            if (pos < 0) {
+                fprintf(stderr, "FATAL: failed to get file size (2): %s\n", path.c_str());
+                return false;
+            }
+
+            if (fseek64(f, 0, SEEK_SET) != 0) {
+                fprintf(stderr, "FATAL: failed to get file size (3): %s\n", path.c_str());
+                return false;
+            }
+
+            size = (uint64_t)pos;
+            printf("%s:\n", path.c_str());
+        }
+
+        if (size > 0) {
+            static const char PROGRESS_PREFIX[] = "  ";
+
+            char size_str[MAX_UINT64_THOUSANDS_SIZE];
+            GetThousandsString(size_str, size);
+
+            int64_t num_sent = 0;
+
+            printf("%s0/%s", PROGRESS_PREFIX, size_str);
+
+            while (!feof(f)) {
+                size_t left = fread(buffer, 1, sizeof buffer, f);
+                if (ferror(f)) {
+                    fprintf(stderr, "FATAL: failed to read from file: %s\n", path.c_str());
+                    return false;
                 }
 
-                p += num_written;
-                left -= num_written;
+                const unsigned char *p = buffer;
+                while (left > 0) {
+                    DWORD num_written;
+                    status = FT_Write(handle, (LPVOID)p, (DWORD)left, &num_written);
+                    if (status != FT_OK) {
+                        return PrintFTD2xxError(status, "FT_Write", options.device.c_str());
+                    }
+
+                    num_sent += num_written;
+                    p += num_written;
+                    left -= num_written;
+
+                    if (show_progress) {
+                        char num_sent_str[MAX_UINT64_THOUSANDS_SIZE];
+                        GetThousandsString(num_sent_str, num_sent);
+                        printf("\r%s%s/%s", PROGRESS_PREFIX, num_sent_str, size_str);
+                    }
+                }
             }
+
+            printf("\n");
         }
     }
 
