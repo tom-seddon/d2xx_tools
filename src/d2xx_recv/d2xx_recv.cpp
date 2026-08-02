@@ -104,6 +104,9 @@ static bool main2(int argc, char *argv[]) {
         printf("Reading from %s:\n", options.device.c_str());
         printf("%s0", PROGRESS_PREFIX);
     }
+
+    uint64_t last_progress_ticks=GetCurrentTickCount();
+    double seconds_per_progress_update=0.5;
     
     if(options.max_num_bytes>0){
         static constexpr DWORD NUM_TO_READ=65536;
@@ -122,12 +125,18 @@ static bool main2(int argc, char *argv[]) {
             }
             
             index+=num_read;
-            
+        
             if(show_progress){
-                char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
-                GetThousandsString(total_num_read_str,index);
-                
-                printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+                uint64_t now_ticks=GetCurrentTickCount();
+                if(GetSecondsFromTicks(now_ticks-last_progress_ticks)>seconds_per_progress_update){
+                    char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
+                    GetThousandsString(total_num_read_str,index);
+                    
+                    printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+                    fflush(stdout);
+
+                    last_progress_ticks=now_ticks;
+                }
             }
         }
         
@@ -157,11 +166,18 @@ static bool main2(int argc, char *argv[]) {
             
             total_num_read += num_read;
             
+        
             if (show_progress) {
-                char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
-                GetThousandsString(total_num_read_str, total_num_read);
-                
-                printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+                uint64_t now_ticks=GetCurrentTickCount();
+                if(GetSecondsFromTicks(now_ticks/last_progress_ticks)>seconds_per_progress_update){
+                    char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
+                    GetThousandsString(total_num_read_str, total_num_read);
+                    
+                    printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+                    fflush(stdout);
+                    
+                    last_progress_ticks=now_ticks;
+                }
             }
             
 #if SYSTEM_WINDOWS
