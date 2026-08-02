@@ -167,6 +167,10 @@ def run_subprocess(argv,options,execute=True,**other_popen_kwargs):
 def main2(options):
     global g_verbose
     g_verbose=options.verbose
+
+    def add_cmake_version_string_arguments(argv):
+        if options.version_string is not None:
+            argv.append('-DVERSION_STRING='+options.version_string)
     
     if is_windows():
         vsyear=None
@@ -194,6 +198,7 @@ def main2(options):
                   '-A',arch,
                   '-S','.',
                   '-B',output_path]
+            add_cmake_version_string_arguments(argv)
 
             ret=run_subprocess(argv,options,close_fds=False)
             if ret.returncode!=0: fatal('init failed')
@@ -212,6 +217,7 @@ def main2(options):
               '-G','Xcode',
               '-S','.',
               '-B',output_path]
+        add_cmake_version_string_arguments(argv)
 
         ret=run_subprocess(argv,options,close_fds=False)
         if ret.returncode!=0: fatal('init failed')
@@ -234,9 +240,8 @@ def main(argv):
             parser.add_argument('--vs%d'%year,action='store_true',help=help)
 
     parser.add_argument('--verbose',action='store_true',help='''be more verbose''')
-
     parser.add_argument('--clean',action='store_true',help='''clean output folder (no questions asked!) before configuring''')
-
+    parser.add_argument('--version-string',metavar='STR',help='''set version string to %(metavar)s''')
     parser.add_argument('-o',dest='output_path',default=None,help='''path to output folder''')
 
     main2(parser.parse_args(argv))

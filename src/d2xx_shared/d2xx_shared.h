@@ -44,6 +44,8 @@ void AddDeviceOptionsCommandLineOptions(CommandLineParser *parser, DeviceOptions
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+const char *GetToolsVersionString();
+
 // always returns false.
 bool PrintFTD2xxError(FT_STATUS status, const char *what, const char *device = nullptr);
 

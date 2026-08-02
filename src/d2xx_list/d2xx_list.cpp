@@ -46,10 +46,10 @@ int main() {
 
         printf(" SerialNumber: %s\n", device->SerialNumber);
 
-        printf(" Type: 0x%x (%s)\n", device->Type, GetFT_DEVICEEnumName(device->Type));
+        printf(" (Type: 0x%x (%s); ", device->Type, GetFT_DEVICEEnumName(device->Type));
 
         // 1=OPENED; 2=HISPEED
-        printf(" Flags: 0x%x", device->Flags);
+        printf("Flags: 0x%x", device->Flags);
         {
             const char *sep = " - ";
 
@@ -63,11 +63,11 @@ int main() {
                 sep = ", ";
             }
         }
-        printf("\n");
+        printf("; ");
 
-        printf(" ID: 0x%x\n", device->ID);
+        printf("ID: 0x%x; ", device->ID);
 
-        printf(" LocId: 0x%x\n", device->LocId);
+        printf("LocId: 0x%x)\n", device->LocId);
 
         // always seems to be NULL?
         //printf(" ftHandle: %p\n", device->ftHandle);

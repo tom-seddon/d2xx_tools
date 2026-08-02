@@ -6,4 +6,14 @@
 com4 d:\tom\github\fdload_dfs\tests\beeblink\fdload_dfs\1\$.SCR0
 #+end_example
 
+* build process
+
+: .\configure.py --clean -o build\release
+
+: "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"  -version 17 -property installationPath
+(this value is VSPATH)
+
+: "%VSPATH%\Common7\IDE\devenv.com" /build RelWithDebInfo build\release\vs2022.Win32\d2xx_tools.sln
+: "%VSPATH%\Common7\IDE\devenv.com" /build RelWithDebInfo build\release\vs2022.x64\d2xx_tools.sln
+
 * eof.
