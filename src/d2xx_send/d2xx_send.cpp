@@ -128,7 +128,7 @@ static bool main2(int argc, char *argv[]) {
             char size_str[MAX_UINT64_THOUSANDS_SIZE];
             GetThousandsString(size_str, size);
 
-            int64_t num_sent = 0;
+            uint64_t num_sent = 0;
 
             printf("%s0/%s", PROGRESS_PREFIX, size_str);
 
