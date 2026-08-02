@@ -56,8 +56,67 @@ pc: prediction failed at E553 old pc was E539
 |   e5 | PCH          | pushed onto stack         |
 |   55 | PCL          | pushed onto stack         |
 |   48 | addr MSB     |                           |
-ac - LDY abs - 3rd cycle of branch taken
-20 60 e5 - jsr e560 - should be 20 60 e4???
+
+bleargh
+
+* decode6502 bug?
+
+Branch `PR/writes` on my Mac.
+
+#+begin_src markdown
+  Using revision c3c58846b052a0713ea31b2d47c9bdd2a6d1698c.
+
+  It looks like the decoder uses the databus value for a write as evidence of the register's value when operating in bytes mode. But it seems this value might not necessarily be correct? - so, if the decoder already has a good idea what the value should be (from a previous read or load), then it should assume that values holds after a write.
+
+  I noticed some unnecessary prediction failures in a trace of the Exile load process from a BBC B, taken with one of Chris Morley's FT232H Tube bus snoop devices. Relevant section of the trace file:
+
+  ```
+  01CE8B80: 80 b1 1b 00 80 c9 85 0b c9 a9 aa 91 1b 00 80 c9 ................
+  01CE8B90: c9 d1 1b 00 80 c9 d0 18 a9 ca 10 10 c3 18 a9 0f ................
+  ```
+
+  Running disassembly (including some previous relevant instructions):
+
+  ```
+  01CE8B66 : 2689 : A9 0F    : LDA #0F        : 2 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=0 C=1
+  01CE8B68 : 268B : 8D 62 FE : STA FE62       : 4 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=0 C=1
+  01CE8B6C : 268E : 8E 60 FE : STX FE60       : 4 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=0 C=1
+  01CE8B70 : 2691 : 8E 32 FE : STX FE32       : 4 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=0 C=1
+  01CE8B74 : 2694 : 8E 30 FE : STX FE30       : 4 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=0 C=1
+  01CE8B78 : 2697 : A0 00    : LDY #00        : 2 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=1 C=1
+  01CE8B7A : 2699 : 84 1B    : STY 1B         : 3 : A=0F X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=1 C=1
+  01CE8B7D : 269B : A9 80    : LDA #80        : 2 : A=80 X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1
+  01CE8B7F : 269D : 85 1C    : STA 1C         : 3 : A=80 X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1
+  01CE8B82 : 269F : B1 1B    : LDA (1B),Y     : 5 : A=C9 X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1
+  01CE8B87 : 26A1 : 85 0B    : STA 0B         : 3 : A=C9 X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1
+  01CE8B8A : 26A3 : A9 AA    : LDA #AA        : 2 : A=AA X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1
+  01CE8B8C : 26A5 : 91 1B    : STA (1B),Y     : 6 : A=C9 X=0F Y=00 SP=FB N=1 V=0 D=0 I=1 Z=0 C=1 prediction failed
+  01CE8B92 : 26A7 : D1 1B    : CMP (1B),Y     : 5 : A=C9 X=0F Y=00 SP=FB N=0 V=0 D=0 I=1 Z=1 C=1
+  ```
+
+  There's a commented disassembly here with matching addresses: https://level7.org.uk/miscellany/exile-disk-protection-and-supervisor-disassembly.txt - this is the sideways RAM detection routine, and it's writing to $8000 to see if the write takes (indicating RAM there).
+
+  ROM f in my BBC B is the BASIC 2 ROM, and the byte at $8000 is $c9 - which is where the $c9 must come from? I assume the ROM will try to drive the bus on any access - and then perhaps the bus snoop will see that instead of the value the CPU tried to write?
+
+  Since the decoder previously saw a `LDA #$AA`, and it knows (or could in principle know) that `STA ($1B),Y` can't modify the accumulator, it feels like it should continue to assume the accumulator is $AA after the STA, despite the traced value. The discrepancy is probably worth noting, but the assumed accumulator value maybe shouldn't change?
+
+  So perhaps `op_STA` (etc.) should be more like this:
+
+  ```
+  static int op_STA(operand_t operand, ea_t ea) {
+     if (A >= 0) {
+        if (operand != A) {
+           failflag = 1;
+        }
+     } else {
+       A = operand;
+     }
+     return operand;
+  }
+  ```
+#+end_src
+
 
 
 * eof.
+

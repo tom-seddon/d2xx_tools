@@ -109,7 +109,7 @@ static bool main2(int argc, char *argv[]) {
     double seconds_per_progress_update = 0.5;
 
     if (options.max_num_bytes > 0) {
-        static constexpr DWORD NUM_TO_READ = 65536;
+        static constexpr DWORD NUM_TO_READ = 4096;
         std::vector<unsigned char> buffer(options.max_num_bytes);
         size_t index = 0;
         while (index < buffer.size()) {
@@ -126,9 +126,9 @@ static bool main2(int argc, char *argv[]) {
 
             index += num_read;
 
-            if (show_progress || index == buffer.size()) {
+            if (show_progress) {
                 uint64_t now_ticks = GetCurrentTickCount();
-                if (GetSecondsFromTicks(now_ticks - last_progress_ticks) > seconds_per_progress_update) {
+                if (index == buffer.size() || GetSecondsFromTicks(now_ticks - last_progress_ticks) > seconds_per_progress_update) {
                     char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
                     GetThousandsString(total_num_read_str, index);
 
