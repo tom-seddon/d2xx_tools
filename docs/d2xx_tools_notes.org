@@ -16,4 +16,48 @@ com4 d:\tom\github\fdload_dfs\tests\beeblink\fdload_dfs\1\$.SCR0
 : "%VSPATH%\Common7\IDE\devenv.com" /build RelWithDebInfo build\release\vs2022.Win32\d2xx_tools.sln
 : "%VSPATH%\Common7\IDE\devenv.com" /build RelWithDebInfo build\release\vs2022.x64\d2xx_tools.sln
 
+* decode6502 oddities
+** exile
+
+#+begin_example
+00000402 : E581 : AD 68 02 : LDA 0268       : 4 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+00000406 : E584 : F0 B3    : BEQ E539       : 3 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+pc: prediction failed at E553 old pc was E539
+00000409 : E553 : 20 60 48 : JSR 4860       : 6 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+0000040F : 4860 : 60       : RTS            : 6 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+00000415 : DEF0 : 90 11    : BCC DF03       : 2 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+00000417 : DEF2 : 24 E6    : BIT E6         : 3 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+0000041A : DEF4 : 50 F0    : BVC DEE6       : 3 : A=00 X=00 Y=?? SP=?? N=0 V=0 D=0 I=0 Z=1 C=1
+#+end_example
+
+#+begin_example
+00000400: a9 ad 68 02 00 f0 b3 ac 20 60 e5 e5 55 48 60 68 ..h..... `..UH`h
+00000410: e5 ef de e5 90 11 24 e6 00 50 f0 ad 24 ff 00 30 ......$..P..$..0
+00000420: 16 ae 41 02 00 20 77 de de ef e5 2c 5f 02 00 10 ..A.. w....,_...
+00000430: 05 a9 ad 68 02 00 f0 b3 ac 20 60 e5 e5 3b e4 b8 ...h..... `..;..
+00000440: 6c 6c 2c 02 64 e4 08 78 33 78 bd bd d8 02 e0 dd ll,.d..x3x......
+00000450: e1 02 e0 f0 72 a8 28 38 e0 33 38 60 60 48 33 3b ....r.(8.38``H3;
+00000460: e5 e4 b0 55 48 60 68 e5 ef de e5 90 11 24 e6 00 ...UH`h......$..
+00000470: 50 f0 ad 24 ff 00 30 16 ae 41 02 00 20 77 de de P..$..0..A.. w..
+#+end_example
+
+| Byte | What         | Notes                     |
+|------+--------------+---------------------------|
+|   ad | LDA abs      |                           |
+|   68 | addr LSB     |                           |
+|   02 | addr MSB     |                           |
+|   00 | byte loaded  |                           |
+|   f0 | BEQ rel      |                           |
+|   b3 | displacement |                           |
+|   ac | LDY abs      | 3rd cycle of branch taken |
+|   20 | JSR abs      |                           |
+|   60 | addr LSB     |                           |
+|   e5 | (read junk)  |                           |
+|   e5 | PCH          | pushed onto stack         |
+|   55 | PCL          | pushed onto stack         |
+|   48 | addr MSB     |                           |
+ac - LDY abs - 3rd cycle of branch taken
+20 60 e5 - jsr e560 - should be 20 60 e4???
+
+
 * eof.
