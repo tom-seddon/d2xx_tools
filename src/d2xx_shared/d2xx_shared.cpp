@@ -41,7 +41,7 @@ bool PrintFTD2xxError(FT_STATUS status, const char *what, const char *device) {
     if (device) {
         fprintf(stderr, " (device: %s)", device);
     }
-    fprintf(stderr, ": %lu (%s)\n", status, GetFT_STATUSEnumName(status));
+    fprintf(stderr, ": %u (%s)\n", status, GetFT_STATUSEnumName(status));
 
     return false;
 }
