@@ -22,6 +22,7 @@ struct Options {
     std::string device;
     DeviceSpec device_spec;
     DeviceOptions device_options;
+    size_t max_num_bytes=0;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,7 @@ static bool DoCommandLine(int argc, char *argv[], Options *options) {
     AddDeviceOptionsCommandLineOptions(&parser, &options->device_options);
 
     parser.AddHelpOption(&options->help);
+    parser.AddOption('n',"num-bytes").Arg(&options->max_num_bytes).Meta("N").Help("finish once N bytes have been read");
 
     std::vector<std::string> other_args;
     if (!parser.Parse(argc, argv, &other_args)) {
@@ -102,38 +104,72 @@ static bool main2(int argc, char *argv[]) {
         printf("Reading from %s:\n", options.device.c_str());
         printf("%s0", PROGRESS_PREFIX);
     }
-
-    unsigned char buffer[65536];
-    for (;;) {
-        DWORD num_read;
-        status = FT_Read(handle, buffer, sizeof buffer, &num_read);
-        if (status != FT_OK) {
-            fprintf(stderr, "FATAL: failed to read from device: %s\n", options.device.c_str());
+    
+    if(options.max_num_bytes>0){
+        static constexpr DWORD NUM_TO_READ=65536;
+        std::vector<unsigned char> buffer(options.max_num_bytes);
+        size_t index=0;
+        while(index<buffer.size()){
+            size_t n=buffer.size()-index;
+            if(n>NUM_TO_READ){
+                n=NUM_TO_READ;
+            }
+            
+            DWORD num_read;
+            status=FT_Read(handle,&buffer[index],(DWORD)n,&num_read);
+            if(status!=FT_OK){
+                return PrintFTD2xxError(status,"FT_Read",options.device.c_str());
+            }
+            
+            index+=num_read;
+            
+            if(show_progress){
+                char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
+                GetThousandsString(total_num_read_str,index);
+                
+                printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+            }
+        }
+        
+        size_t num_written=fwrite(buffer.data(),1,buffer.size(),f);
+        if(num_written!=buffer.size()){
+            fprintf(stderr, "FATAL: failed to write to file: %s\n", options.path.c_str());
             return false;
         }
 
-        if (num_read > 0) {
-            size_t num_written = fwrite(buffer, 1, num_read, f);
-            if (num_written != num_read) {
-                fprintf(stderr, "FATAL: failed to write to file: %s\n", options.path.c_str());
+    }else{
+        for (;;) {
+            unsigned char buffer[65536];
+            DWORD num_read;
+            status = FT_Read(handle, buffer, sizeof buffer, &num_read);
+            if (status != FT_OK) {
+                return PrintFTD2xxError(status,"FT_Read",options.device.c_str());
                 return false;
             }
-        }
-
-        total_num_read += num_read;
-
-        if (show_progress) {
-            char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
-            GetThousandsString(total_num_read_str, total_num_read);
-
-            printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
-        }
-
+            
+            if (num_read > 0) {
+                size_t num_written = fwrite(buffer, 1, num_read, f);
+                if (num_written != num_read) {
+                    fprintf(stderr, "FATAL: failed to write to file: %s\n", options.path.c_str());
+                    return false;
+                }
+            }
+            
+            total_num_read += num_read;
+            
+            if (show_progress) {
+                char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
+                GetThousandsString(total_num_read_str, total_num_read);
+                
+                printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
+            }
+            
 #if SYSTEM_WINDOWS
-        if (_kbhit()) {
-            break;
-        }
+            if (_kbhit()) {
+                break;
+            }
 #endif
+        }
     }
 
     printf("\n");
