@@ -22,11 +22,17 @@ class CommandLineParser;
 
 // not amazing naming for this really.
 struct DeviceSpec {
+#if SYSTEM_WINDOWS
     bool open_by_serial_number = false;
+#else
+    bool open_by_serial_number = true;
+#endif
     bool open_by_description = false;
 };
 
 void AddDeviceSpecCommandLineOptions(CommandLineParser *parser, DeviceSpec *device_spec);
+
+std::string GetDefaultDeviceNameDescription();
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

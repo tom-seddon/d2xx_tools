@@ -25,16 +25,17 @@ struct Options {
     std::string device;
     DeviceSpec device_spec;
     DeviceOptions device_options;
-    size_t buffer_size=0;
-    bool circular_buffer=false;
-    bool buffer=false;
+    size_t buffer_size = 0;
+    bool circular_buffer = false;
+    bool buffer = false;
+    std::string boundaries_path;
 };
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
 static bool DoCommandLine(int argc, char *argv[], Options *options) {
-    CommandLineParser parser("receive file over FTDI serial device (Version: " + std::string(GetToolsVersionString()) + ")",
+    CommandLineParser parser("receive file over FTDI serial device (supply " + GetDefaultDeviceNameDescription() + ")\n\nVersion : " + GetToolsVersionString() + ")",
                              "[OPTIONS] DEVICE FILE");
 
     AddDeviceSpecCommandLineOptions(&parser, &options->device_spec);
@@ -42,7 +43,9 @@ static bool DoCommandLine(int argc, char *argv[], Options *options) {
 
     parser.AddHelpOption(&options->help);
     parser.AddOption('b', "buffer").Arg(&options->buffer_size).Meta("N").SetIfPresent(&options->buffer).Help("read into a fixed-size buffer of N bytes, stopping once full");
-    parser.AddOption('c',"circular").Arg(&options->buffer_size).Meta("N").SetIfPresent(&options->circular_buffer).Help("read indefinitely, keeping up to approx the last N bytes (exact amount kept may differ slightly)");
+    parser.AddOption('c', "circular").Arg(&options->buffer_size).Meta("N").SetIfPresent(&options->circular_buffer).Help("read indefinitely, keeping up to approx the last N bytes (exact amount kept may differ slightly)");
+
+    parser.AddOption("boundaries-file").Arg(&options->boundaries_path).Meta("FILE").Help("write split point offsets to FILE");
 
     std::vector<std::string> other_args;
     if (!parser.Parse(argc, argv, &other_args)) {
@@ -58,15 +61,15 @@ static bool DoCommandLine(int argc, char *argv[], Options *options) {
         fprintf(stderr, "FATAL: XON/XOFF flow control not currently supported\n");
         return false;
     }
-   
-    if(options->buffer||options->circular_buffer){
-        if(options->buffer&&options->circular_buffer){
-            fprintf(stderr,"FATAL: --buffer and --circular are mutually exclusive\n");
+
+    if (options->buffer || options->circular_buffer) {
+        if (options->buffer && options->circular_buffer) {
+            fprintf(stderr, "FATAL: --buffer and --circular are mutually exclusive\n");
             return false;
         }
-        
-        if(options->buffer_size==0){
-            fprintf(stderr,"FATAL: invalid buffer size: %zu\n",options->buffer_size);
+
+        if (options->buffer_size == 0) {
+            fprintf(stderr, "FATAL: invalid buffer size: %zu\n", options->buffer_size);
             return false;
         }
     }
@@ -83,20 +86,20 @@ static bool DoCommandLine(int argc, char *argv[], Options *options) {
 #if !SYSTEM_WINDOWS
 static std::atomic<bool> g_received_SIGINT{false};
 
-static void HandleSIGINT(int){
-    g_received_SIGINT.store(true,std::memory_order_release);
+static void HandleSIGINT(int) {
+    g_received_SIGINT.store(true, std::memory_order_release);
 }
 #endif
 
-static bool ShouldQuit(){
+static bool ShouldQuit() {
 #if SYSTEM_WINDOWS
-    
+
     return _kbhit();
-    
+
 #else
-    
+
     return g_received_SIGINT.load(std::memory_order_acquire);
-    
+
 #endif
 }
 
@@ -105,28 +108,58 @@ static bool ShouldQuit(){
 
 static constexpr double SECONDS_PER_PROGRESS_UPDATE = 0.5;
 
-static bool ShowProgress(bool show_progress,bool force,uint64_t *last_progress_ticks){
-    if(show_progress){
-        uint64_t now_ticks=GetCurrentTickCount();
-        if(force||GetSecondsFromTicks(now_ticks-*last_progress_ticks)>SECONDS_PER_PROGRESS_UPDATE){
-            *last_progress_ticks=now_ticks;
+static bool ShowProgress(bool show_progress, bool force, uint64_t *last_progress_ticks) {
+    if (show_progress) {
+        uint64_t now_ticks = GetCurrentTickCount();
+        if (force || GetSecondsFromTicks(now_ticks - *last_progress_ticks) > SECONDS_PER_PROGRESS_UPDATE) {
+            *last_progress_ticks = now_ticks;
             return true;
         }
     }
-    
+
     return false;
 }
 
-static bool WriteDataToFile(const void *data,size_t data_size_bytes,FILE *f,const std::string&path){
-    if(data_size_bytes>0){
-        size_t num_written = fwrite(data,1,data_size_bytes,f);
+static bool WriteDataToFile(const void *data, size_t data_size_bytes, FILE *f, const std::string &path) {
+    if (data_size_bytes > 0) {
+        size_t num_written = fwrite(data, 1, data_size_bytes, f);
         if (num_written != data_size_bytes) {
             fprintf(stderr, "FATAL: failed to write to file: %s\n", path.c_str());
             return false;
         }
     }
-        
+
     return true;
+}
+
+static char *StoreUInt64Text(uint64_t value, char *p) {
+    *p++ = HEX_CHARS_LC[value >> 60];
+    *p++ = HEX_CHARS_LC[value >> 56 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 52 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 48 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 44 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 40 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 36 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 32 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 28 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 24 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 20 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 16 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 12 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 8 & 0xf];
+
+    *p++ = HEX_CHARS_LC[value >> 4 & 0xf];
+    *p++ = HEX_CHARS_LC[value >> 0 & 0xf];
+
+    *p++ = '\n';
+
+    return p;
 }
 
 static bool main2(int argc, char *argv[]) {
@@ -162,6 +195,15 @@ static bool main2(int argc, char *argv[]) {
         return false;
     }
 
+    FILE *f_boundaries = nullptr;
+    if (!options.boundaries_path.empty()) {
+        f_boundaries = fopen(options.boundaries_path.c_str(), "wb");
+        if (!f) {
+            fprintf(stderr, "FATAL: failed to open boundaries file: %s\n", options.boundaries_path.c_str());
+            return false;
+        }
+    }
+
     bool show_progress = true;
 
     static const char PROGRESS_PREFIX[] = "  Received bytes: ";
@@ -173,25 +215,25 @@ static bool main2(int argc, char *argv[]) {
     }
 
     uint64_t last_progress_ticks = GetCurrentTickCount();
-    
+
 #if !SYSTEM_WINDOWS
     {
-        struct sigaction act={};
-        act.sa_handler=&HandleSIGINT;
-        if(sigaction(SIGINT,&act,nullptr)==-1){
-            fprintf(stderr,"FATAL: failed to install SIGINT handler: %s\n",strerror(errno));
+        struct sigaction act = {};
+        act.sa_handler = &HandleSIGINT;
+        if (sigaction(SIGINT, &act, nullptr) == -1) {
+            fprintf(stderr, "FATAL: failed to install SIGINT handler: %s\n", strerror(errno));
             return false;
         }
     }
 #endif
-    
-    if(options.buffer){
+
+    if (options.buffer) {
         static constexpr DWORD NUM_TO_READ = 4096;
         std::vector<unsigned char> buffer(options.buffer_size);
         char buffer_size_str[MAX_UINT64_THOUSANDS_SIZE];
-        GetThousandsString(buffer_size_str,options.buffer_size);
+        GetThousandsString(buffer_size_str, options.buffer_size);
         size_t index = 0;
-        while(index<buffer.size()&&!ShouldQuit()){
+        while (index < buffer.size() && !ShouldQuit()) {
             size_t n = buffer.size() - index;
             if (n > NUM_TO_READ) {
                 n = NUM_TO_READ;
@@ -205,67 +247,70 @@ static bool main2(int argc, char *argv[]) {
 
             index += num_read;
 
-            if(ShowProgress(show_progress,index==buffer.size(),&last_progress_ticks)){
+            if (ShowProgress(show_progress, index == buffer.size(), &last_progress_ticks)) {
                 char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
                 GetThousandsString(total_num_read_str, index);
-                
-                printf("\r%s%s/%s", PROGRESS_PREFIX, total_num_read_str,buffer_size_str);
+
+                printf("\r%s%s/%s", PROGRESS_PREFIX, total_num_read_str, buffer_size_str);
                 fflush(stdout);
             }
         }
 
-        if(!WriteDataToFile(buffer.data(),index,f,options.path)){
+        if (!WriteDataToFile(buffer.data(), index, f, options.path)) {
             return false;
         }
-    }else if(options.circular_buffer){
-        static constexpr DWORD NUM_TO_READ=4096;
-        std::vector<unsigned char>buffer(options.buffer_size);
-        size_t index=0;
-        bool ever_wrapped=false;
-        while(!ShouldQuit()){
-            size_t n=buffer.size()-index;
-            if(n>NUM_TO_READ){
-                n=NUM_TO_READ;
+    } else if (options.circular_buffer) {
+        static constexpr DWORD NUM_TO_READ = 4096;
+        std::vector<unsigned char> buffer(options.buffer_size);
+        size_t index = 0;
+        bool ever_wrapped = false;
+        while (!ShouldQuit()) {
+            size_t n = buffer.size() - index;
+            if (n > NUM_TO_READ) {
+                n = NUM_TO_READ;
             }
-            
+
             DWORD num_read;
-            status=FT_Read(handle,&buffer[index],(DWORD)n,&num_read);
-            if(status!=FT_OK){
-                return PrintFTD2xxError(status,"FT_Read",options.device.c_str());
+            status = FT_Read(handle, &buffer[index], (DWORD)n, &num_read);
+            if (status != FT_OK) {
+                return PrintFTD2xxError(status, "FT_Read", options.device.c_str());
             }
-            
-            index+=num_read;
-            ASSERT(index<=buffer.size());
-            if(index==buffer.size()){
-                index=0;
-                ever_wrapped=true;
+
+            index += num_read;
+            ASSERT(index <= buffer.size());
+            if (index == buffer.size()) {
+                index = 0;
+                ever_wrapped = true;
             }
-            
-            if(ShowProgress(show_progress,false,&last_progress_ticks)){
+
+            if (ShowProgress(show_progress, false, &last_progress_ticks)) {
                 char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
                 GetThousandsString(total_num_read_str, index);
-                
+
                 printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
                 fflush(stdout);
             }
         }
-        
-        if(ever_wrapped){
-            if(!WriteDataToFile(&buffer[index],buffer.size()-index,f,options.path)){
+
+        if (ever_wrapped) {
+            if (!WriteDataToFile(&buffer[index], buffer.size() - index, f, options.path)) {
                 return false;
             }
-               
-            if(!WriteDataToFile(&buffer[0],index,f,options.path)){
+
+            if (!WriteDataToFile(&buffer[0], index, f, options.path)) {
                 return false;
             }
-        }else{
-            if(!WriteDataToFile(buffer.data(),index,f,options.path)){
+        } else {
+            if (!WriteDataToFile(buffer.data(), index, f, options.path)) {
                 return false;
             }
         }
     } else {
-        while(!ShouldQuit()){
-            unsigned char buffer[65536];
+        unsigned char buffer[65536];
+        char boundaries_buffer[sizeof buffer / 9 * 9];
+        char *boundary_ptr = boundaries_buffer;
+
+        while (!ShouldQuit()) {
             DWORD num_read;
             status = FT_Read(handle, buffer, sizeof buffer, &num_read);
             if (status != FT_OK) {
@@ -273,20 +318,44 @@ static bool main2(int argc, char *argv[]) {
                 return false;
             }
 
-            if(!WriteDataToFile(buffer,num_read,f,options.path)){
+            if (!WriteDataToFile(buffer, num_read, f, options.path)) {
                 return false;
+            }
+
+            if (!options.boundaries_path.empty()) {
+                boundary_ptr = StoreUInt64Text(total_num_read, boundary_ptr);
+                ASSERT(boundary_ptr <= boundaries_buffer + sizeof boundaries_buffer);
+                if (boundary_ptr == boundaries_buffer + sizeof boundaries_buffer) {
+                    if (!WriteDataToFile(boundaries_buffer, sizeof boundaries_buffer, f_boundaries, options.boundaries_path)) {
+                        return false;
+                    }
+
+                    boundary_ptr = boundaries_buffer;
+                }
             }
 
             total_num_read += num_read;
 
-            if(ShowProgress(show_progress,false,&last_progress_ticks)){
+            if (ShowProgress(show_progress, false, &last_progress_ticks)) {
                 char total_num_read_str[MAX_UINT64_THOUSANDS_SIZE];
                 GetThousandsString(total_num_read_str, total_num_read);
-                
+
                 printf("\r%s%s", PROGRESS_PREFIX, total_num_read_str);
                 fflush(stdout);
             }
         }
+
+        if (f_boundaries) {
+            if (boundary_ptr > boundaries_buffer) {
+                if (!WriteDataToFile(boundaries_buffer, (size_t)(boundary_ptr - boundaries_buffer), f_boundaries, options.boundaries_path)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    if (f_boundaries) {
+        fclose(f_boundaries), f_boundaries = nullptr;
     }
 
     printf("\n");

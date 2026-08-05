@@ -25,7 +25,7 @@ struct Options {
 //////////////////////////////////////////////////////////////////////////
 
 static bool DoCommandLine(int argc, char *argv[], Options *options) {
-    CommandLineParser parser("send file over FTDI serial device (Version: " + std::string(GetToolsVersionString()) + ")",
+    CommandLineParser parser("send file(s) over FTDI serial device (supply " + GetDefaultDeviceNameDescription() + "\n\nVersion: " + GetToolsVersionString() + ")",
                              "[OPTIONS] DEVICE FILE0 [FILE1...]");
 
     AddDeviceSpecCommandLineOptions(&parser, &options->device_spec);

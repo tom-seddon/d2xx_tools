@@ -28,19 +28,19 @@ int main() {
 
         printf("Device %zu:\n", device_index);
 
-#if SYSTEM_WINDOWS
         FT_HANDLE handle = nullptr;
         status = FT_OpenEx((PVOID)device->SerialNumber, FT_OPEN_BY_SERIAL_NUMBER, &handle);
         if (status == FT_OK) {
             LONG com_port;
             status = FT_GetComPortNumber(handle, &com_port);
             if (status == FT_OK) {
-                printf(" COM port: COM%ld\n", com_port);
+                printf(" COM port: COM%" PRIu32 "\n", com_port);
+            } else {
+                // always fails on non-Windows...
             }
             FT_Close(handle);
             handle = nullptr;
         }
-#endif
 
         printf(" Description: \"%s\"\n", device->Description);
 

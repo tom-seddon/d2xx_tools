@@ -11,8 +11,21 @@
 //////////////////////////////////////////////////////////////////////////
 
 void AddDeviceSpecCommandLineOptions(CommandLineParser *parser, DeviceSpec *device_spec) {
+#if SYSTEM_WINDOWS
     parser->AddOption("serial-number").SetIfPresent(&device_spec->open_by_serial_number).Help("DEVICE is device's serial number");
+#endif
     parser->AddOption("description").SetIfPresent(&device_spec->open_by_serial_number).Help("DEVICE is device's description");
+}
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+std::string GetDefaultDeviceNameDescription(){
+#if SYSTEM_WINDOWS
+    return "COM port name";
+#else
+    return "device serial number";
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -131,17 +144,21 @@ const FT_DEVICE_LIST_INFO_NODE *FindDeviceByDescription(const std::vector<FT_DEV
 FT_HANDLE OpenDevice(const std::vector<FT_DEVICE_LIST_INFO_NODE> &devices, const std::string &name, const DeviceSpec &spec, const DeviceOptions &options) {
     FT_STATUS status;
 
+    const char *method = nullptr;
     const FT_DEVICE_LIST_INFO_NODE *device;
     if (spec.open_by_description) {
+        method = "by description";
         device = FindDeviceByDescription(devices, name);
     } else if (spec.open_by_serial_number) {
+        method = "by serial number";
         device = FindDeviceBySerialNumber(devices, name);
     } else {
+        method = "by COM port";
         device = FindDeviceByCOMPortName(devices, name);
     }
 
     if (!device) {
-        fprintf(stderr, "FATAL: failed to find device: %s\n", name.c_str());
+        fprintf(stderr, "FATAL: failed to find device %s: %s\n", method, name.c_str());
         return nullptr;
     }
 
